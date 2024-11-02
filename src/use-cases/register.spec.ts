@@ -1,11 +1,16 @@
-import { InvalidCredentials } from './errors/invalid-credentials.error';
+import { UserRepository } from '../domain/user.repository';
+import { InMemoryUserRepository } from '../repositories/in-memory/in-memory-user.repository';
+import { InvalidCredentialsError } from './errors/invalid-credentials.error';
+import { UserAlreadyExistsError } from './errors/user-already-exists.error';
 import { RegisterUseCase } from './register';
 
+let userRepository: UserRepository;
 let sut: RegisterUseCase;
 
 describe('Register User', () => {
   beforeEach(() => {
-    sut = new RegisterUseCase();
+    userRepository = new InMemoryUserRepository();
+    sut = new RegisterUseCase(userRepository);
   });
 
   it('should not be able register an user if name is invalid', async () => {
@@ -16,7 +21,7 @@ describe('Register User', () => {
     };
 
     await expect(() => sut.execute(input)).rejects.toBeInstanceOf(
-      InvalidCredentials,
+      InvalidCredentialsError,
     );
   });
 
@@ -28,7 +33,7 @@ describe('Register User', () => {
     };
 
     await expect(() => sut.execute(input)).rejects.toBeInstanceOf(
-      InvalidCredentials,
+      InvalidCredentialsError,
     );
   });
 
@@ -40,15 +45,40 @@ describe('Register User', () => {
     };
 
     await expect(() => sut.execute(input)).rejects.toBeInstanceOf(
-      InvalidCredentials,
+      InvalidCredentialsError,
+    );
+  });
+
+  it('should not be able register an user with same e-mail', async () => {
+    await sut.execute({
+      email: 'john@example.com',
+      name: 'John Doe',
+      password: '123456',
+    });
+
+    expect(
+      async () =>
+        await sut.execute({
+          email: 'john@example.com',
+          name: 'John Doe',
+          password: '123456',
+        }),
+    ).rejects.toBeInstanceOf(UserAlreadyExistsError);
+  });
+
+  it('should be able register an user', async () => {
+    const { user } = await sut.execute({
+      email: 'john@example.com',
+      name: 'John Doe',
+      password: '123456',
+    });
+
+    expect(user._id).toEqual(expect.any(String));
+    expect(user).toEqual(
+      expect.objectContaining({
+        email: 'john@example.com',
+        name: 'John Doe',
+      }),
     );
   });
 });
-
-// Recebe uma requisição do tipo POST na rota /api/signup
-// Valida dados obrigatórios name, email, password e passwordConfirmation
-// Valida que o campo email é um e-mail válido
-// Valida se já existe um usuário com o email fornecido
-// Gera uma senha criptografada (essa senha não pode ser descriptografada)
-// Cria uma conta para o usuário com os dados informados, substituindo a senha pela senha criptorafada
-// Retorna 201 sem informacao
